@@ -1,0 +1,6 @@
+streamlit>=1.40
+python-dotenv>=1.0
+pydantic>=2.7
+langchain-core>=0.3
+langchain-google-genai>=2.0
+email-validator>=2.1
