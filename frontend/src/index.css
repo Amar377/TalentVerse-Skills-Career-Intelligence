@@ -1,0 +1,73 @@
+﻿@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+    --background: 36 38% 94%;
+    --foreground: 300 8% 15%;
+    --card: 40 100% 99%;
+    --card-foreground: 300 8% 15%;
+    --popover: 40 100% 99%;
+    --popover-foreground: 300 8% 15%;
+    --primary: 12 51% 43%;
+    --primary-foreground: 40 100% 99%;
+    --secondary: 32 32% 91%;
+    --secondary-foreground: 300 8% 15%;
+    --muted: 32 32% 91%;
+    --muted-foreground: 300 5% 48%;
+    --accent: 32 56% 63%;
+    --accent-foreground: 300 8% 15%;
+    --destructive: 0 63% 48%;
+    --destructive-foreground: 40 100% 99%;
+    --border: 32 28% 85%;
+    --input: 32 28% 85%;
+    --ring: 12 51% 43%;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    color-scheme: dark;
+    --background: 285 17% 10%;
+    --foreground: 36 38% 92%;
+    --card: 282 14% 14%;
+    --card-foreground: 36 38% 92%;
+    --popover: 282 14% 14%;
+    --popover-foreground: 36 38% 92%;
+    --primary: 15 53% 57%;
+    --primary-foreground: 285 17% 10%;
+    --secondary: 283 12% 20%;
+    --secondary-foreground: 36 38% 92%;
+    --muted: 283 12% 20%;
+    --muted-foreground: 315 8% 68%;
+    --accent: 35 51% 61%;
+    --accent-foreground: 285 17% 10%;
+    --destructive: 0 55% 45%;
+    --destructive-foreground: 36 38% 92%;
+    --border: 282 12% 25%;
+    --input: 282 12% 25%;
+    --ring: 15 53% 57%;
+  }
+
+  * { border-color: hsl(var(--border)); }
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  h1, h2, h3 { font-family: Georgia, 'Times New Roman', serif; letter-spacing: -0.035em; }
+  button, a, input, textarea, select { -webkit-tap-highlight-color: transparent; }
+  :focus-visible { outline: 2px solid #a64b35; outline-offset: 2px; }
+}
+
+::-webkit-scrollbar { width: 7px; height: 7px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(129, 119, 128, 0.32); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(129, 119, 128, 0.55); }
+.glass-panel { background: rgba(255, 252, 247, .88); backdrop-filter: blur(14px); border: 1px solid rgba(231, 222, 211, .9); }
+.dark .glass-panel { background: rgba(40, 31, 43, .9); border-color: rgba(255, 255, 255, .08); }
+.hero-glow { background: radial-gradient(ellipse at 68% 12%, rgba(214, 166, 106, .2), transparent 52%); }
+.dark .hero-glow { background: radial-gradient(ellipse at 68% 12%, rgba(166, 75, 53, .18), transparent 55%); }
