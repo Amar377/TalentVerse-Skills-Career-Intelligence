@@ -1,6 +1,7 @@
 """Authentication utilities: token creation, password hashing, and user dependencies."""
 import hashlib
 import hmac
+import re
 import secrets
 from datetime import datetime, timedelta
 from typing import Optional
@@ -13,6 +14,15 @@ from backend.config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
 from backend.database import get_db, User
 
 security = HTTPBearer(auto_error=False)
+DEMO_EMAIL_PREFIX = "demo-session-"
+DEMO_EMAIL_DOMAIN = "@demo.talentverse.ai"
+_TEMPORARY_DEMO_EMAIL = re.compile(
+    rf"{re.escape(DEMO_EMAIL_PREFIX)}[0-9a-f]{{32}}{re.escape(DEMO_EMAIL_DOMAIN)}"
+)
+
+
+def is_temporary_demo_user(user: User) -> bool:
+    return bool(user.is_demo) and _TEMPORARY_DEMO_EMAIL.fullmatch(user.email) is not None
 
 
 def hash_password(password: str) -> str:
@@ -58,10 +68,12 @@ def get_current_user_optional(
     token = credentials.credentials
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: str = payload.get("sub")
-        if not user_id:
+        user_id = payload.get("sub")
+        if not isinstance(user_id, str) or not user_id:
             return None
         user = db.query(User).filter(User.id == user_id).first()
+        if user and user.is_demo and not is_temporary_demo_user(user):
+            return None
         return user
     except jwt.PyJWTError:
         return None

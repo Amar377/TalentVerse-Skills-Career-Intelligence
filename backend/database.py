@@ -33,6 +33,7 @@ class User(Base):
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
     profiles = relationship("CandidateProfileModel", back_populates="user", cascade="all, delete-orphan")
+    resume_records = relationship("ResumeRecordModel", back_populates="user", cascade="all, delete-orphan")
     roadmaps = relationship("RoadmapModel", back_populates="user", cascade="all, delete-orphan")
     job_matches = relationship("JobMatchModel", back_populates="user", cascade="all, delete-orphan")
     project_briefs = relationship("ProjectBriefModel", back_populates="user", cascade="all, delete-orphan")
@@ -80,6 +81,8 @@ class ResumeRecordModel(Base):
     raw_text = Column(Text, nullable=False)
     parsed_profile = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User", back_populates="resume_records")
 
 
 class RoadmapModel(Base):

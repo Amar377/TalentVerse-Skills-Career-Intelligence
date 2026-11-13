@@ -1,16 +1,19 @@
 """TalentVerse 2.0 FastAPI Backend Application."""
+import asyncio
+import logging
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
-from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from sqlalchemy.exc import SQLAlchemyError
 
 from backend.config import CORS_ORIGINS
-from backend.database import init_db, SessionLocal, User, CandidateProfileModel
-from backend.auth_utils import hash_password
+from backend.database import init_db, SessionLocal
 from backend.ai_engine import AIProviderUnavailable, RateLimitError
+from backend.routes.auth import cleanup_expired_demo_sessions
 from backend.routes import (
     auth,
     resumes,
@@ -24,76 +27,47 @@ from backend.routes import (
     system,
 )
 
+logger = logging.getLogger(__name__)
+DEMO_CLEANUP_INTERVAL_SECONDS = 60 * 60
+
 # Initialize database schemas immediately
 init_db()
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Pre-seed demo user and profile if fresh database
+def _cleanup_expired_demo_sessions_once() -> None:
     db = SessionLocal()
     try:
-        demo_user = db.query(User).filter(User.email == "demo@talentverse.ai").first()
-        if not demo_user:
-            demo_user = User(
-                email="demo@talentverse.ai",
-                hashed_password=hash_password("talentverse123"),
-                full_name="Alex Morgan",
-                role="candidate",
-                is_demo=True,
-            )
-            db.add(demo_user)
-            db.commit()
-            db.refresh(demo_user)
-
-            profile = CandidateProfileModel(
-                user_id=demo_user.id,
-                full_name="Alex Morgan",
-                email="demo@talentverse.ai",
-                phone="+1 (555) 019-2834",
-                location="San Francisco, CA / Remote",
-                target_role="Full Stack AI Engineer",
-                experience_level="Entry-level",
-                summary="Full stack engineer specializing in Python, React, TypeScript, and AI integrations. Focused on developing production-grade SaaS products with automated testing and modern design systems.",
-                skills=["Python", "FastAPI", "React", "TypeScript", "SQL", "Git", "Docker", "Tailwind CSS", "REST APIs", "Azure Fundamentals"],
-                soft_skills=["System Design", "Technical Problem Solving", "Effective Communication", "Agile Collaboration"],
-                experience=[
-                    "Software Engineering Fellow — TechLabs (2024): Developed modular full-stack web applications and automated data pipelines.",
-                    "Undergraduate Teaching Assistant — Computer Science Dept (2023): Mentored 40+ students in data structures and Python programming."
-                ],
-                education=[
-                    "B.Tech in Computer Science and Engineering - Expected Graduation: 2027"
-                ],
-                certifications=[
-                    "Microsoft Azure Fundamentals (AZ-900)",
-                    "AWS Certified Cloud Practitioner"
-                ],
-                projects=[
-                    "TalentVerse: AI-powered career intelligence SaaS platform with multi-provider fallbacks and dynamic skill roadmapping.",
-                    "Real-Time Analytics Pipeline: Distributed event streaming platform processing 10k events/sec."
-                ],
-                missing_information=[
-                    "Quantified latency metrics on recent fellowship work",
-                    "Links to live public repositories"
-                ],
-                strengths=[
-                    "Strong full stack foundation across backend services and modern frontend frameworks",
-                    "Demonstrated initiative in AI integration and cloud certification",
-                    "High attention to code modularity and architecture standards"
-                ],
-                improvement_recommendations=[
-                    "Add measurable benchmarks (latency reduction, query throughput) to project achievements",
-                    "Practice distributed system architecture interviews",
-                    "Deploy projects to live cloud environments with automated CI/CD"
-                ],
-                readiness_score=85,
-            )
-            db.add(profile)
-            db.commit()
+        cleanup_expired_demo_sessions(db)
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        logger.exception("Expired demo session cleanup failed.")
     finally:
         db.close()
 
-    yield
+
+async def _demo_session_cleanup_worker() -> None:
+    while True:
+        cleanup_task = asyncio.create_task(
+            asyncio.to_thread(_cleanup_expired_demo_sessions_once)
+        )
+        try:
+            await asyncio.shield(cleanup_task)
+        except asyncio.CancelledError:
+            await cleanup_task
+            raise
+        await asyncio.sleep(DEMO_CLEANUP_INTERVAL_SECONDS)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    cleanup_task = asyncio.create_task(_demo_session_cleanup_worker())
+    try:
+        yield
+    finally:
+        cleanup_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await cleanup_task
 
 
 app = FastAPI(
