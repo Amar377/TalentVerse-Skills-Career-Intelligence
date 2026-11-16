@@ -6,14 +6,13 @@ from sqlalchemy import (
     create_engine, Column, String, Integer, Text, Boolean, DateTime, ForeignKey, JSON, inspect, text
 )
 from sqlalchemy.engine import Engine
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship, Session
 from backend.config import DB_URL
 
-# SQLite connect args
-connect_args = {"check_same_thread": False} if DB_URL.startswith("sqlite") else {}
+connect_args = {"check_same_thread": False} if DB_URL and DB_URL.startswith("sqlite") else {}
 
-engine = create_engine(DB_URL, connect_args=connect_args)
+engine = create_engine(DB_URL, connect_args=connect_args, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -208,7 +207,7 @@ def migrate_candidate_profile_resume_analysis(bind: Engine = engine) -> None:
                         f"ADD COLUMN resume_analysis {column_type} NOT NULL DEFAULT '{{}}'"
                     )
                 )
-    except OperationalError:
+    except DBAPIError:
         # Another process may have added the same column after our initial inspection.
         columns = {
             column["name"]

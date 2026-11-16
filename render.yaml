@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: talentverse-api
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: TALENTVERSE_ENV
+        value: production
+      - key: TALENTVERSE_SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: AI_PROVIDER_ORDER
+        value: groq,gemini,openai,mistral

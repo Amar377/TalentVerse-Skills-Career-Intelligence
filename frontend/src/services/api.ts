@@ -10,8 +10,13 @@ import {
   DashboardStats,
   SystemStatus,
 } from '../types';
+import { joinApiUrl } from './apiBase.js';
 
-const API_BASE = '/api/v1';
+const API_BASE = joinApiUrl(import.meta.env.VITE_API_BASE_URL, 'api/v1');
+
+function apiUrl(endpoint: string): string {
+  return joinApiUrl(API_BASE, endpoint);
+}
 
 class ApiError extends Error {
   status: number;
@@ -34,7 +39,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     ...options.headers,
   };
 
-  const response = await fetch(`${API_BASE}${endpoint}`, {
+  const response = await fetch(apiUrl(endpoint), {
     ...options,
     headers,
   });
@@ -92,7 +97,7 @@ export const api = {
       formData.append('replace_profile', String(replaceProfile));
 
       const token = localStorage.getItem('talentverse_token');
-      const response = await fetch(`${API_BASE}/resumes/upload`, {
+      const response = await fetch(apiUrl('/resumes/upload'), {
         method: 'POST',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formData,
