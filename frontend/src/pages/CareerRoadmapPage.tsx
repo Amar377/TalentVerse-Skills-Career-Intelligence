@@ -3,35 +3,47 @@ import { Compass, CheckCircle2, Circle, Sparkles, ExternalLink, BookOpen, Slider
 import { api } from '../services/api';
 import { CareerRoadmap } from '../types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/Card';
+import { AIModelSelector } from '../components/AIModelSelector';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Input } from '../components/ui/Input';
 import { Skeleton } from '../components/ui/Skeleton';
 import { useToast } from '../context/ToastContext';
+import { useAIProvider } from '../hooks/useAIProvider';
 
 export const CareerRoadmapPage: React.FC = () => {
   const { success, error } = useToast();
+  const { providers, preferredProvider, selectProvider, loadingProviders } = useAIProvider();
 
   const [roadmap, setRoadmap] = useState<CareerRoadmap | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [savingWeek, setSavingWeek] = useState<number | null>(null);
 
   // Form State
-  const [targetGoal, setTargetGoal] = useState('Full Stack AI Engineer');
-  const [skillsText, setSkillsText] = useState('Python, FastAPI, React, SQL, Git');
+  const [targetGoal, setTargetGoal] = useState('');
+  const [skillsText, setSkillsText] = useState('');
   const [level, setLevel] = useState('Entry-level');
   const [durationWeeks, setDurationWeeks] = useState(8);
 
   useEffect(() => {
     async function loadRoadmap() {
       try {
-        const latest = await api.roadmaps.getLatest();
+        const [latestResult, profileResult] = await Promise.allSettled([
+          api.roadmaps.getLatest(),
+          api.profiles.getMyProfile(),
+        ]);
+        const latest = latestResult.status === 'fulfilled' ? latestResult.value : null;
         if (latest) {
           setRoadmap(latest);
-          setTargetGoal(latest.career_goal);
           setDurationWeeks(latest.duration_weeks);
-          setLevel(latest.experience_level);
         }
+        const profile = profileResult.status === 'fulfilled' ? profileResult.value : null;
+        setTargetGoal(latest?.career_goal || profile?.target_role?.trim() || '');
+        if (profile?.skills.length) setSkillsText(profile.skills.join(', '));
+        if (profile?.experience_level) setLevel(profile.experience_level);
+        if (!latest && latestResult.status === 'rejected') throw latestResult.reason;
+        if (!profile && profileResult.status === 'rejected') throw profileResult.reason;
       } catch (err) {
         console.error('Failed to load roadmap', err);
       } finally {
@@ -56,6 +68,7 @@ export const CareerRoadmapPage: React.FC = () => {
         career_goal: targetGoal.trim(),
         experience_level: level,
         duration_weeks: durationWeeks,
+        preferred_provider: preferredProvider,
       });
       setRoadmap(res);
       success('Roadmap Generated', `Created strategic ${durationWeeks}-week roadmap for ${targetGoal}`);
@@ -67,7 +80,8 @@ export const CareerRoadmapPage: React.FC = () => {
   };
 
   const handleToggleMilestone = async (week: number, currentCompleted: boolean) => {
-    if (!roadmap) return;
+    if (!roadmap || savingWeek !== null) return;
+    setSavingWeek(week);
     try {
       const updated = await api.roadmaps.toggleMilestone(roadmap.id, week, !currentCompleted);
       setRoadmap(updated);
@@ -76,6 +90,8 @@ export const CareerRoadmapPage: React.FC = () => {
       }
     } catch (err: any) {
       error('Update failed', err.message || 'Could not toggle milestone.');
+    } finally {
+      setSavingWeek(null);
     }
   };
 
@@ -158,6 +174,16 @@ export const CareerRoadmapPage: React.FC = () => {
                 value={skillsText}
                 onChange={(e) => setSkillsText(e.target.value)}
                 placeholder="Python, React, SQL..."
+              />
+            </div>
+
+            <div className="lg:col-span-1">
+              <AIModelSelector
+                providers={providers}
+                preferredProvider={preferredProvider}
+                onChange={selectProvider}
+                loading={loadingProviders}
+                disabled={generating}
               />
             </div>
 
@@ -277,6 +303,10 @@ export const CareerRoadmapPage: React.FC = () => {
                   <CardHeader className="flex flex-row items-start justify-between pb-3">
                     <div className="flex items-start gap-3">
                       <button
+                        type="button"
+                        aria-label={m.completed ? `Mark week ${m.week} incomplete` : `Mark week ${m.week} complete`}
+                        aria-pressed={m.completed}
+                        disabled={savingWeek !== null}
                         onClick={() => handleToggleMilestone(m.week, m.completed)}
                         className={`mt-0.5 p-1 rounded-lg transition-colors ${
                           m.completed

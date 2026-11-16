@@ -1,12 +1,35 @@
 import React, { useState, useEffect } from 'react';
-import { UserCircle, Save, X, Sparkles, Layers, Briefcase } from 'lucide-react';
+import { UserCircle, Save, X, Sparkles, Layers, Briefcase, GraduationCap, CheckCircle2 } from 'lucide-react';
 import { api } from '../services/api';
-import { CandidateProfile } from '../types';
+import { CandidateProfile, ResumeAnalysisDetails } from '../types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input, Textarea } from '../components/ui/Input';
 import { Skeleton } from '../components/ui/Skeleton';
 import { useToast } from '../context/ToastContext';
+
+const ReadOnlyList: React.FC<{ label: string; items?: string[] }> = ({ label, items = [] }) => {
+  if (items.length === 0) return null;
+
+  return (
+    <div>
+      <h4 className="text-xs font-semibold text-slate-600 dark:text-slate-300">{label}</h4>
+      <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-slate-700 dark:text-slate-300">
+        {items.map((item, index) => <li key={`${label}-${index}`}>{item}</li>)}
+      </ul>
+    </div>
+  );
+};
+
+const hasResumeAnalysis = (analysis?: ResumeAnalysisDetails) => {
+  if (!analysis) return false;
+  return Object.values(analysis).some((value) => {
+    if (Array.isArray(value)) return value.length > 0;
+    if (value !== null && typeof value === 'object') return Object.keys(value).length > 0;
+    if (typeof value === 'string') return value.trim().length > 0;
+    return value !== null && value !== undefined;
+  });
+};
 
 export const ProfilePage: React.FC = () => {
   const { success, error } = useToast();
@@ -21,6 +44,8 @@ export const ProfilePage: React.FC = () => {
 
   // Experience input helper
   const [newExp, setNewExp] = useState('');
+  const [newEducation, setNewEducation] = useState('');
+  const [newCertification, setNewCertification] = useState('');
 
   // Project input helper
   const [newProj, setNewProj] = useState('');
@@ -44,7 +69,21 @@ export const ProfilePage: React.FC = () => {
     if (!profile) return;
     setSaving(true);
     try {
-      const updated = await api.profiles.updateMyProfile(profile);
+      const updated = await api.profiles.updateMyProfile({
+        full_name: profile.full_name,
+        email: profile.email,
+        phone: profile.phone,
+        location: profile.location,
+        target_role: profile.target_role,
+        experience_level: profile.experience_level,
+        summary: profile.summary,
+        skills: profile.skills,
+        soft_skills: profile.soft_skills,
+        experience: profile.experience,
+        education: profile.education,
+        certifications: profile.certifications,
+        projects: profile.projects,
+      });
       setProfile(updated);
       success('Profile Saved', 'Your master candidate profile has been updated.');
     } catch (err: any) {
@@ -100,6 +139,28 @@ export const ProfilePage: React.FC = () => {
     });
   };
 
+  const addEducation = () => {
+    if (!newEducation.trim() || !profile) return;
+    setProfile({ ...profile, education: [...profile.education, newEducation.trim()] });
+    setNewEducation('');
+  };
+
+  const removeEducation = (index: number) => {
+    if (!profile) return;
+    setProfile({ ...profile, education: profile.education.filter((_, i) => i !== index) });
+  };
+
+  const addCertification = () => {
+    if (!newCertification.trim() || !profile) return;
+    setProfile({ ...profile, certifications: [...profile.certifications, newCertification.trim()] });
+    setNewCertification('');
+  };
+
+  const removeCertification = (index: number) => {
+    if (!profile) return;
+    setProfile({ ...profile, certifications: profile.certifications.filter((_, i) => i !== index) });
+  };
+
   const addProject = () => {
     if (!newProj.trim() || !profile) return;
     setProfile({ ...profile, projects: [...profile.projects, newProj.trim()] });
@@ -124,6 +185,8 @@ export const ProfilePage: React.FC = () => {
   }
 
   if (!profile) return null;
+
+  const analysis = profile.resume_analysis;
 
   return (
     <form onSubmit={handleSave} className="space-y-8 pb-16">
@@ -429,6 +492,188 @@ export const ProfilePage: React.FC = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* 4. Education & Certifications */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <GraduationCap className="w-4 h-4 text-indigo-500" /> Education ({profile.education.length})
+            </CardTitle>
+            <CardDescription>Edit the education details extracted from your resume.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex gap-2">
+              <Input
+                placeholder="Degree, institution, graduation year"
+                value={newEducation}
+                onChange={(e) => setNewEducation(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addEducation();
+                  }
+                }}
+              />
+              <Button type="button" onClick={addEducation} variant="secondary" size="sm">Add</Button>
+            </div>
+            <div className="space-y-2">
+              {profile.education.map((education, index) => (
+                <div key={`${education.slice(0, 40)}-${index}`} className="flex items-start justify-between gap-3 rounded-xl bg-slate-50 p-3 text-xs text-slate-700 dark:bg-navy-950/60 dark:text-slate-300">
+                  <span>{education}</span>
+                  <button type="button" aria-label={`Remove education ${index + 1}`} onClick={() => removeEducation(index)} className="text-slate-400 hover:text-rose-500">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-500" /> Certifications ({profile.certifications.length})
+            </CardTitle>
+            <CardDescription>Edit certifications and issuing organizations.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex gap-2">
+              <Input
+                placeholder="Certification and issuing organization"
+                value={newCertification}
+                onChange={(e) => setNewCertification(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addCertification();
+                  }
+                }}
+              />
+              <Button type="button" onClick={addCertification} variant="secondary" size="sm">Add</Button>
+            </div>
+            <div className="space-y-2">
+              {profile.certifications.map((certification, index) => (
+                <div key={`${certification.slice(0, 40)}-${index}`} className="flex items-start justify-between gap-3 rounded-xl bg-slate-50 p-3 text-xs text-slate-700 dark:bg-navy-950/60 dark:text-slate-300">
+                  <span>{certification}</span>
+                  <button type="button" aria-label={`Remove certification ${index + 1}`} onClick={() => removeCertification(index)} className="text-slate-400 hover:text-rose-500">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Saved Resume Analysis</CardTitle>
+          <CardDescription>
+            AI-generated analysis is read-only here. Edit your verified profile information in the sections above.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {!hasResumeAnalysis(analysis) ? (
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              No resume analysis has been saved yet. Analyze a resume to see ATS and section-level feedback here.
+            </p>
+          ) : (
+            <>
+              {(analysis?.current_role || analysis?.total_experience) && (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  {analysis.current_role && (
+                    <div>
+                      <h4 className="text-xs font-semibold text-slate-600 dark:text-slate-300">Current Role</h4>
+                      <p className="mt-1 text-sm text-slate-800 dark:text-slate-200">{analysis.current_role}</p>
+                    </div>
+                  )}
+                  {analysis.total_experience && (
+                    <div>
+                      <h4 className="text-xs font-semibold text-slate-600 dark:text-slate-300">Total Experience</h4>
+                      <p className="mt-1 text-sm text-slate-800 dark:text-slate-200">{analysis.total_experience}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {analysis?.ats_score != null && (
+                <div>
+                  <h4 className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                    ATS Readiness Estimate: {analysis.ats_score}/100
+                  </h4>
+                  {analysis.ats_score_explanation && (
+                    <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">{analysis.ats_score_explanation}</p>
+                  )}
+                </div>
+              )}
+
+              {analysis?.summary_quality_analysis && (
+                <div>
+                  <h4 className="text-xs font-semibold text-slate-600 dark:text-slate-300">Summary Assessment</h4>
+                  <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">{analysis.summary_quality_analysis}</p>
+                </div>
+              )}
+              <ReadOnlyList label="Summary Improvement Suggestions" items={analysis?.summary_improvement_suggestions} />
+              <ReadOnlyList label="Target-Role Skill Alignment" items={analysis?.target_role_skill_alignment} />
+              <ReadOnlyList label="Project Improvement Suggestions" items={analysis?.project_improvement_suggestions} />
+
+              {Object.entries(analysis?.skills_by_category ?? {}).map(([category, skills]) => (
+                <ReadOnlyList key={category} label={`${category} Skills`} items={skills} />
+              ))}
+
+              {(analysis?.experience_analysis ?? []).map((item, index) => (
+                <section key={`${item.company ?? ''}-${item.job_title ?? ''}-${index}`} className="space-y-2 border-t border-slate-200 pt-4 dark:border-slate-800">
+                  <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                    {[item.job_title, item.company, item.duration].filter(Boolean).join(' · ') || `Experience ${index + 1}`}
+                  </h4>
+                  <ReadOnlyList label="Responsibilities" items={item.responsibilities} />
+                  <ReadOnlyList label="Achievements" items={item.achievements} />
+                  <ReadOnlyList label="Missing Measurable Results" items={item.missing_measurable_results} />
+                  <ReadOnlyList label="Suggestions" items={item.suggestions} />
+                </section>
+              ))}
+
+              {(analysis?.education_analysis ?? []).length > 0 && (
+                <section className="space-y-2 border-t border-slate-200 pt-4 dark:border-slate-800">
+                  <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Education Analysis</h4>
+                  {(analysis?.education_analysis ?? []).map((item, index) => (
+                    <p key={`${item.institution ?? ''}-${index}`} className="text-sm text-slate-700 dark:text-slate-300">
+                      {[item.degree, item.institution, item.graduation_year].filter(Boolean).join(' · ') || `Education entry ${index + 1}`}
+                    </p>
+                  ))}
+                </section>
+              )}
+
+              {(analysis?.projects_analysis ?? []).map((item, index) => (
+                <section key={`${item.name ?? ''}-${index}`} className="space-y-2 border-t border-slate-200 pt-4 dark:border-slate-800">
+                  <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                    {item.name || `Project ${index + 1}`}
+                  </h4>
+                  {item.description && <p className="text-sm text-slate-700 dark:text-slate-300">{item.description}</p>}
+                  <ReadOnlyList label="Technologies" items={item.technologies} />
+                  <ReadOnlyList label="Achievements" items={item.achievements} />
+                  <ReadOnlyList label="Suggestions" items={item.suggestions} />
+                </section>
+              ))}
+
+              <ReadOnlyList label="ATS-Matched Keywords" items={analysis?.ats_matched_keywords} />
+              <ReadOnlyList label="Potentially Missing Keywords" items={analysis?.ats_missing_keywords} />
+              <ReadOnlyList label="Formatting Issues" items={analysis?.ats_formatting_issues} />
+              {Object.keys(analysis?.ats_section_completeness ?? {}).length > 0 && (
+                <div>
+                  <h4 className="text-xs font-semibold text-slate-600 dark:text-slate-300">Section Completeness</h4>
+                  <ul className="mt-1 space-y-1 text-sm text-slate-700 dark:text-slate-300">
+                    {Object.entries(analysis?.ats_section_completeness ?? {}).map(([section, present]) => (
+                      <li key={section}>{section}: {present ? 'Present' : 'Missing'}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
     </form>
   );
 };

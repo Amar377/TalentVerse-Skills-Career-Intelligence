@@ -11,7 +11,7 @@ def csv_env(name: str, default: str) -> list[str]:
     return [item.strip().lower() for item in os.getenv(name, default).split(",") if item.strip()]
 
 # AI Provider Configuration
-AI_PROVIDER_ORDER = csv_env("AI_PROVIDER_ORDER", "gemini,groq,openai,mistral")
+AI_PROVIDER_ORDER = csv_env("AI_PROVIDER_ORDER", "groq,gemini,openai,mistral")
 PROVIDER_MODELS = {
     "gemini": os.getenv("GEMINI_MODEL", "gemini-3.8-flash"),
     "groq": os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),

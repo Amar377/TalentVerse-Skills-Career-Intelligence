@@ -15,6 +15,7 @@ from backend.ai_engine import (
     generate_interview_questions_ai,
     evaluate_interview_ai,
 )
+from backend.profile_context import build_candidate_context
 
 router = APIRouter(prefix="/interviews", tags=["Interview Coach"])
 
@@ -23,12 +24,21 @@ router = APIRouter(prefix="/interviews", tags=["Interview Coach"])
 def get_questions(
     payload: InterviewQuestionRequest,
     user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
+    profile = (
+        db.query(CandidateProfileModel)
+        .filter(CandidateProfileModel.user_id == user.id)
+        .order_by(CandidateProfileModel.updated_at.desc(), CandidateProfileModel.created_at.desc())
+        .first()
+    )
     questions, provider, model = generate_interview_questions_ai(
         target_role=payload.target_role,
         interview_type=payload.interview_type,
         level=payload.level,
         session_id=user.id,
+        preferred_provider=payload.preferred_provider,
+        candidate_context=build_candidate_context(profile),
     )
     return InterviewQuestionsResponse(
         target_role=payload.target_role,
@@ -42,12 +52,20 @@ def evaluate_answer(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    profile = (
+        db.query(CandidateProfileModel)
+        .filter(CandidateProfileModel.user_id == user.id)
+        .order_by(CandidateProfileModel.updated_at.desc(), CandidateProfileModel.created_at.desc())
+        .first()
+    )
     evaluation, provider, model = evaluate_interview_ai(
         target_role=payload.target_role,
         interview_type=payload.interview_type,
         question=payload.question,
         user_answer=payload.user_answer,
         session_id=user.id,
+        preferred_provider=payload.preferred_provider,
+        candidate_context=build_candidate_context(profile),
     )
 
     record = InterviewModel(

@@ -85,9 +85,11 @@ export const api = {
 
   // Resumes
   resumes: {
-    async upload(file: File): Promise<{ profile: CandidateProfile; raw_text: string; provider_used: string | null; model_used: string | null }> {
+    async upload(file: File, preferredProvider?: string, replaceProfile = false): Promise<{ profile: CandidateProfile; raw_text: string; provider_used: string | null; model_used: string | null }> {
       const formData = new FormData();
       formData.append('file', file);
+      if (preferredProvider) formData.append('preferred_provider', preferredProvider);
+      formData.append('replace_profile', String(replaceProfile));
 
       const token = localStorage.getItem('talentverse_token');
       const response = await fetch(`${API_BASE}/resumes/upload`, {
@@ -107,10 +109,10 @@ export const api = {
       return response.json();
     },
 
-    async analyzeText(resume_text: string) {
+    async analyzeText(resume_text: string, preferred_provider?: string, replace_profile = false) {
       return request<{ profile: CandidateProfile; raw_text: string; provider_used: string | null; model_used: string | null }>('/resumes/analyze-text', {
         method: 'POST',
-        body: JSON.stringify({ resume_text }),
+        body: JSON.stringify({ resume_text, preferred_provider, replace_profile }),
       });
     },
 
@@ -121,7 +123,7 @@ export const api = {
 
   // Career Roadmaps
   roadmaps: {
-    async generate(data: { skills: string[]; career_goal: string; experience_level: string; duration_weeks: number }): Promise<CareerRoadmap> {
+    async generate(data: { skills: string[]; career_goal: string; experience_level: string; duration_weeks: number; preferred_provider?: string }): Promise<CareerRoadmap> {
       return request<CareerRoadmap>('/roadmaps/generate', {
         method: 'POST',
         body: JSON.stringify(data),
@@ -143,7 +145,7 @@ export const api = {
 
   // Job Matcher
   jobs: {
-    async match(data: { job_description: string; target_role?: string; company?: string; profile_id?: string; custom_profile?: any }): Promise<JobMatch> {
+    async match(data: { job_description: string; target_role?: string; company?: string; profile_id?: string; custom_profile?: any; preferred_provider?: string }): Promise<JobMatch> {
       return request<JobMatch>('/jobs/match', {
         method: 'POST',
         body: JSON.stringify(data),
@@ -159,7 +161,7 @@ export const api = {
 
   // Projects
   projects: {
-    async generate(data: { interests: string[]; skills?: string[]; domain?: string; difficulty?: string }): Promise<ProjectBrief[]> {
+    async generate(data: { interests: string; skills?: string[]; domain?: string; difficulty?: string; preferred_provider?: string }): Promise<ProjectBrief[]> {
       return request<ProjectBrief[]>('/projects/generate', {
         method: 'POST',
         body: JSON.stringify(data),
@@ -172,13 +174,13 @@ export const api = {
 
   // Interviews
   interviews: {
-    async getQuestions(data: { target_role: string; interview_type: string; level: string }): Promise<{ target_role: string; questions: InterviewQuestion[] }> {
+    async getQuestions(data: { target_role: string; interview_type: string; level: string; preferred_provider?: string }): Promise<{ target_role: string; questions: InterviewQuestion[] }> {
       return request<{ target_role: string; questions: InterviewQuestion[] }>('/interviews/questions', {
         method: 'POST',
         body: JSON.stringify(data),
       });
     },
-    async evaluate(data: { target_role: string; interview_type: string; question: string; user_answer: string }): Promise<InterviewAnalysis> {
+    async evaluate(data: { target_role: string; interview_type: string; question: string; user_answer: string; preferred_provider?: string }): Promise<InterviewAnalysis> {
       return request<InterviewAnalysis>('/interviews/evaluate', {
         method: 'POST',
         body: JSON.stringify(data),

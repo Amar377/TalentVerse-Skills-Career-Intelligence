@@ -101,12 +101,12 @@ export const SettingsPage: React.FC = () => {
                 : !systemStatus
                   ? 'Status unavailable'
                   : systemStatus.providers.some((provider) => provider.configured)
-                    ? 'Provider keys loaded'
+                    ? 'Provider credentials loaded'
                     : 'No provider configured'}
             </Badge>
           </div>
           <CardDescription>
-            TalentVerse dynamically cascades requests across configured providers in priority order.
+            Each AI task starts with your selected model, then tries other configured providers if that model fails. “Key loaded” confirms configuration only, not a live provider health check.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

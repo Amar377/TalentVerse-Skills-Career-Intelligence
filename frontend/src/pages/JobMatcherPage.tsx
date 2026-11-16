@@ -3,18 +3,21 @@ import { Crosshair, CheckCircle2, AlertTriangle, Sparkles, Briefcase, Graduation
 import { api } from '../services/api';
 import { JobMatch, CandidateProfile } from '../types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/Card';
+import { AIModelSelector } from '../components/AIModelSelector';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Textarea, Input } from '../components/ui/Input';
 import { Skeleton } from '../components/ui/Skeleton';
 import { useToast } from '../context/ToastContext';
+import { useAIProvider } from '../hooks/useAIProvider';
 
 export const JobMatcherPage: React.FC = () => {
   const { success, error, warning } = useToast();
+  const { providers, preferredProvider, selectProvider, loadingProviders } = useAIProvider();
 
   const [jobDescription, setJobDescription] = useState('');
-  const [targetRole, setTargetRole] = useState('Senior Full Stack Engineer');
-  const [company, setCompany] = useState('Tech Innovations Inc');
+  const [targetRole, setTargetRole] = useState('');
+  const [company, setCompany] = useState('');
   const [profiles, setProfiles] = useState<CandidateProfile[]>([]);
   const [selectedProfileId, setSelectedProfileId] = useState<string>('');
 
@@ -32,6 +35,7 @@ export const JobMatcherPage: React.FC = () => {
         if (profileList.status === 'fulfilled' && profileList.value.length > 0) {
           setProfiles(profileList.value);
           setSelectedProfileId(profileList.value[0].id || '');
+          setTargetRole(profileList.value[0].target_role || '');
         }
         if (latestMatch.status === 'fulfilled' && latestMatch.value) {
           setMatchResult(latestMatch.value);
@@ -62,6 +66,7 @@ export const JobMatcherPage: React.FC = () => {
         target_role: targetRole.trim(),
         company: company.trim(),
         profile_id: selectedProfileId || undefined,
+        preferred_provider: preferredProvider,
       });
       setMatchResult(res);
       success('Match Analysis Complete', `Fit Score: ${res.match_score_percent}% for ${res.target_role}`);
@@ -113,6 +118,16 @@ export const JobMatcherPage: React.FC = () => {
                   onChange={(e) => setTargetRole(e.target.value)}
                   placeholder="e.g. Senior Backend Engineer"
                   required
+                />
+              </div>
+
+              <div className="max-w-sm">
+                <AIModelSelector
+                  providers={providers}
+                  preferredProvider={preferredProvider}
+                  onChange={selectProvider}
+                  loading={loadingProviders}
+                  disabled={isMatching}
                 />
               </div>
 

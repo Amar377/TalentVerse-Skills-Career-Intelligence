@@ -11,6 +11,7 @@ from backend.schemas import (
 )
 from backend.auth_utils import get_current_user
 from backend.ai_engine import generate_roadmap_ai
+from backend.profile_context import build_candidate_context
 
 router = APIRouter(prefix="/roadmaps", tags=["Career Roadmaps"])
 
@@ -21,12 +22,20 @@ def generate_roadmap(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    profile = (
+        db.query(CandidateProfileModel)
+        .filter(CandidateProfileModel.user_id == user.id)
+        .order_by(CandidateProfileModel.updated_at.desc(), CandidateProfileModel.created_at.desc())
+        .first()
+    )
     roadmap_data, provider, model = generate_roadmap_ai(
         skills=payload.skills,
         goal=payload.career_goal,
         level=payload.experience_level,
         weeks=payload.duration_weeks,
         session_id=user.id,
+        preferred_provider=payload.preferred_provider,
+        candidate_context=build_candidate_context(profile),
     )
 
     roadmap_record = RoadmapModel(
@@ -58,9 +67,8 @@ def generate_roadmap(
     )
     db.add(report)
 
-    # Update candidate profile target role if not set
-    profile = db.query(CandidateProfileModel).filter(CandidateProfileModel.user_id == user.id).first()
-    if profile and not profile.target_role:
+    # Keep the candidate profile aligned with the career goal they selected.
+    if profile:
         profile.target_role = payload.career_goal
 
     db.commit()
@@ -109,7 +117,7 @@ def toggle_milestone(
     if not roadmap:
         raise HTTPException(status_code=404, detail="Roadmap not found.")
 
-    milestones = list(roadmap.milestones or [])
+    milestones = [dict(milestone) for milestone in roadmap.milestones or []]
     updated = False
     for m in milestones:
         if m.get("week") == payload.week:

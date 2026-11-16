@@ -7,6 +7,49 @@ export interface User {
   created_at?: string;
 }
 
+export interface ResumeExperienceAnalysis {
+  company?: string | null;
+  job_title?: string | null;
+  duration?: string | null;
+  responsibilities: string[];
+  achievements: string[];
+  missing_measurable_results: string[];
+  suggestions: string[];
+}
+
+export interface ResumeEducationAnalysis {
+  degree?: string | null;
+  institution?: string | null;
+  graduation_year?: string | null;
+}
+
+export interface ResumeProjectAnalysis {
+  name?: string | null;
+  technologies: string[];
+  description?: string | null;
+  achievements: string[];
+  suggestions: string[];
+}
+
+export interface ResumeAnalysisDetails {
+  current_role?: string | null;
+  total_experience?: string | null;
+  summary_quality_analysis: string;
+  summary_improvement_suggestions: string[];
+  skills_by_category: Record<string, string[]>;
+  target_role_skill_alignment: string[];
+  experience_analysis: ResumeExperienceAnalysis[];
+  education_analysis: ResumeEducationAnalysis[];
+  projects_analysis: ResumeProjectAnalysis[];
+  project_improvement_suggestions: string[];
+  ats_score?: number | null;
+  ats_score_explanation: string;
+  ats_matched_keywords: string[];
+  ats_missing_keywords: string[];
+  ats_formatting_issues: string[];
+  ats_section_completeness: Record<string, boolean>;
+}
+
 export interface CandidateProfile {
   id?: string;
   user_id?: string;
@@ -27,6 +70,23 @@ export interface CandidateProfile {
   strengths: string[];
   improvement_recommendations: string[];
   readiness_score: number;
+  current_role?: string | null;
+  total_experience?: string | null;
+  summary_quality_analysis?: string;
+  summary_improvement_suggestions?: string[];
+  skills_by_category?: Record<string, string[]>;
+  target_role_skill_alignment?: string[];
+  experience_analysis?: ResumeExperienceAnalysis[];
+  education_analysis?: ResumeEducationAnalysis[];
+  projects_analysis?: ResumeProjectAnalysis[];
+  project_improvement_suggestions?: string[];
+  ats_score?: number | null;
+  ats_score_explanation?: string;
+  ats_matched_keywords?: string[];
+  ats_missing_keywords?: string[];
+  ats_formatting_issues?: string[];
+  ats_section_completeness?: Record<string, boolean>;
+  resume_analysis?: ResumeAnalysisDetails;
 }
 
 export interface MilestoneItem {

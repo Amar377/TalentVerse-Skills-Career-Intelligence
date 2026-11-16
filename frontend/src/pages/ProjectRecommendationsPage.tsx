@@ -1,17 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { Sparkles, CheckCircle2, Sliders } from 'lucide-react';
 import { api } from '../services/api';
-import { ProjectBrief } from '../types';
+import { CandidateProfile, ProjectBrief } from '../types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/Card';
+import { AIModelSelector } from '../components/AIModelSelector';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { Skeleton } from '../components/ui/Skeleton';
 import { useToast } from '../context/ToastContext';
+import { useAIProvider } from '../hooks/useAIProvider';
 
 export const ProjectRecommendationsPage: React.FC = () => {
   const { success, error } = useToast();
+  const { providers, preferredProvider, selectProvider, loadingProviders } = useAIProvider();
 
   const [projects, setProjects] = useState<ProjectBrief[]>([]);
   const [loading, setLoading] = useState(true);
@@ -19,15 +22,25 @@ export const ProjectRecommendationsPage: React.FC = () => {
   const [selectedProject, setSelectedProject] = useState<ProjectBrief | null>(null);
 
   // Form State
-  const [interests, setInterests] = useState('AI career intelligence, distributed systems, developer productivity');
-  const [domain, setDomain] = useState('Full Stack & Applied AI');
+  const [interests, setInterests] = useState('');
+  const [candidateProfile, setCandidateProfile] = useState<CandidateProfile | null>(null);
+  const [domain, setDomain] = useState('General');
   const [difficulty, setDifficulty] = useState('Intermediate');
 
   useEffect(() => {
     async function loadProjects() {
       try {
-        const list = await api.projects.list();
-        setProjects(list);
+        const [listResult, profileResult] = await Promise.allSettled([
+          api.projects.list(),
+          api.profiles.getMyProfile(),
+        ]);
+        if (listResult.status === 'fulfilled') setProjects(listResult.value);
+        if (profileResult.status === 'fulfilled') {
+          setCandidateProfile(profileResult.value);
+          setInterests(profileResult.value.target_role ? `Projects for a ${profileResult.value.target_role} career path` : '');
+        }
+        if (listResult.status === 'rejected') throw listResult.reason;
+        if (profileResult.status === 'rejected') throw profileResult.reason;
       } catch (err) {
         console.error('Failed to load projects', err);
       } finally {
@@ -47,9 +60,11 @@ export const ProjectRecommendationsPage: React.FC = () => {
     setGenerating(true);
     try {
       const res = await api.projects.generate({
-        interests: interests.split(',').map((s) => s.trim()),
+        interests: interests.split(',').map((s) => s.trim()).filter(Boolean).join(', '),
+        skills: candidateProfile?.skills || [],
         domain,
         difficulty,
+        preferred_provider: preferredProvider,
       });
       setProjects(res);
       success('Projects Generated', `Created ${res.length} portfolio architecture briefs.`);
@@ -104,6 +119,16 @@ export const ProjectRecommendationsPage: React.FC = () => {
                 onChange={(e) => setInterests(e.target.value)}
                 placeholder="e.g. AI tools, cloud infrastructure, fintech"
                 required
+              />
+            </div>
+
+            <div>
+              <AIModelSelector
+                providers={providers}
+                preferredProvider={preferredProvider}
+                onChange={selectProvider}
+                loading={loadingProviders}
+                disabled={generating}
               />
             </div>
 

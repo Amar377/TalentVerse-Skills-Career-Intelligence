@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { Menu, Sun, Moon, Bell, Sparkles, UserCircle, Settings, LogOut, ChevronRight } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
-import { api } from '../../services/api';
-import { SystemStatus } from '../../types';
+import { useAIProvider } from '../../hooks/useAIProvider';
 
 interface HeaderProps {
   onMobileMenuClick: () => void;
@@ -14,22 +13,10 @@ export const Header: React.FC<HeaderProps> = ({ onMobileMenuClick }) => {
   const { theme, toggleTheme } = useTheme();
   const { user, logout } = useAuth();
   const location = useLocation();
+  const { providers, preferredProvider, selectProvider, loadingProviders } = useAIProvider();
 
-  const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-
-  useEffect(() => {
-    async function loadStatus() {
-      try {
-        const s = await api.system.getStatus();
-        setSystemStatus(s);
-      } catch {
-        // fallback
-      }
-    }
-    loadStatus();
-  }, []);
 
   const routeTitles: Record<string, string> = {
     '/app': 'Career Intelligence Dashboard',
@@ -67,18 +54,32 @@ export const Header: React.FC<HeaderProps> = ({ onMobileMenuClick }) => {
         </div>
       </div>
 
-      {/* Right: AI Provider Pill, Theme, Notifications, User */}
+      {/* Right: Model Selection, Theme, Notifications, User */}
       <div className="flex items-center gap-3">
-        {/* Live Provider Status Pill */}
-        <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-navy-950/80 border border-slate-200/80 dark:border-slate-800 text-xs font-mono">
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-          </span>
-          <span className="text-slate-600 dark:text-slate-300 font-medium flex items-center gap-1">
-            <Sparkles className="w-3 h-3 text-brand-500" />
-            {systemStatus?.active_model || 'AI unavailable'}
-          </span>
+        <div className="hidden sm:flex items-center gap-2">
+          <Sparkles className="w-3.5 h-3.5 text-brand-500 shrink-0" />
+          <label htmlFor="header-ai-model" className="sr-only">Preferred AI model</label>
+          <select
+            id="header-ai-model"
+            aria-label="Preferred AI model"
+            title="Preferred model is tried first; other configured providers are fallbacks."
+            value={preferredProvider}
+            onChange={(event) => selectProvider(event.target.value)}
+            disabled={loadingProviders || providers.length === 0}
+            className="max-w-[150px] sm:max-w-[210px] rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-navy-950 text-xs text-slate-700 dark:text-slate-200 px-2 py-1.5 disabled:opacity-60"
+          >
+            {providers.length === 0 ? (
+              <option value="groq">
+                {loadingProviders ? 'Loading AI models…' : 'No configured AI models'}
+              </option>
+            ) : (
+              providers.map((provider) => (
+                <option key={provider.name} value={provider.name}>
+                  {provider.name.toUpperCase()} · {provider.model}
+                </option>
+              ))
+            )}
+          </select>
         </div>
 
         {/* Theme Toggle */}

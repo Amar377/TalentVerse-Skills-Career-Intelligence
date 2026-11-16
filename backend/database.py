@@ -3,8 +3,10 @@ import datetime
 import uuid
 from typing import Generator
 from sqlalchemy import (
-    create_engine, Column, String, Integer, Text, Boolean, DateTime, ForeignKey, JSON
+    create_engine, Column, String, Integer, Text, Boolean, DateTime, ForeignKey, JSON, inspect, text
 )
+from sqlalchemy.engine import Engine
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship, Session
 from backend.config import DB_URL
 
@@ -64,6 +66,7 @@ class CandidateProfileModel(Base):
     strengths = Column(JSON, default=list)
     improvement_recommendations = Column(JSON, default=list)
     readiness_score = Column(Integer, default=0)
+    resume_analysis = Column(JSON, default=dict, server_default=text("'{}'"), nullable=False)
 
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
@@ -184,8 +187,40 @@ class SavedReportModel(Base):
     user = relationship("User", back_populates="saved_reports")
 
 
-def init_db():
-    Base.metadata.create_all(bind=engine)
+def migrate_candidate_profile_resume_analysis(bind: Engine = engine) -> None:
+    """Add the resume-analysis column to databases created before it was introduced."""
+    if "candidate_profiles" not in inspect(bind).get_table_names():
+        return
+
+    try:
+        with bind.begin() as connection:
+            columns = {
+                column["name"]
+                for column in inspect(connection).get_columns("candidate_profiles")
+            }
+            if "resume_analysis" not in columns:
+                column_type = CandidateProfileModel.__table__.c.resume_analysis.type.compile(
+                    dialect=connection.dialect
+                )
+                connection.execute(
+                    text(
+                        "ALTER TABLE candidate_profiles "
+                        f"ADD COLUMN resume_analysis {column_type} NOT NULL DEFAULT '{{}}'"
+                    )
+                )
+    except OperationalError:
+        # Another process may have added the same column after our initial inspection.
+        columns = {
+            column["name"]
+            for column in inspect(bind).get_columns("candidate_profiles")
+        }
+        if "resume_analysis" not in columns:
+            raise
+
+
+def init_db(bind: Engine = engine):
+    Base.metadata.create_all(bind=bind)
+    migrate_candidate_profile_resume_analysis(bind)
 
 
 def get_db() -> Generator[Session, None, None]:

@@ -1,7 +1,11 @@
 """Extracts clean text from uploaded PDF, DOCX, and text resumes."""
 import io
 import re
+import zipfile
 from typing import Tuple
+
+
+SUPPORTED_RESUME_FORMATS = "PDF, DOCX, TXT, or Markdown (.md)"
 
 
 def clean_extracted_text(text: str) -> str:
@@ -22,14 +26,15 @@ def extract_text_from_pdf(file_bytes: bytes) -> str:
     except ImportError:
         import fitz
 
-    doc = fitz.open(stream=file_bytes, filetype="pdf")
-    pages_text = []
-    for page_num in range(len(doc)):
-        page = doc[page_num]
-        text = page.get_text("text")
-        if text.strip():
-            pages_text.append(text)
-    doc.close()
+    try:
+        with fitz.open(stream=file_bytes, filetype="pdf") as doc:
+            pages_text = []
+            for page_num in range(len(doc)):
+                text = doc[page_num].get_text("text")
+                if text.strip():
+                    pages_text.append(text)
+    except fitz.FileDataError as exc:
+        raise ValueError("This PDF is invalid or unreadable. Please upload a valid PDF.") from exc
     return clean_extracted_text("\n\n".join(pages_text))
 
 
@@ -38,7 +43,14 @@ def extract_text_from_docx(file_bytes: bytes) -> str:
     import docx
 
     doc_stream = io.BytesIO(file_bytes)
-    doc = docx.Document(doc_stream)
+    try:
+        doc = docx.Document(doc_stream)
+    except (
+        zipfile.BadZipFile,
+        docx.opc.exceptions.PackageNotFoundError,
+        docx.exceptions.InvalidXmlError,
+    ) as exc:
+        raise ValueError("This DOCX file is invalid or unreadable. Please upload a valid DOCX.") from exc
     paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
     
     # Also extract text from tables
@@ -64,4 +76,4 @@ def parse_resume_file(filename: str, file_bytes: bytes) -> Tuple[str, str]:
         except UnicodeDecodeError:
             return clean_extracted_text(file_bytes.decode("latin-1", errors="ignore")), "text"
     else:
-        raise ValueError(f"Unsupported file format '{filename}'. Please upload a PDF, DOCX, TXT, or MD file.")
+        raise ValueError(f"Unsupported file format. Please upload {SUPPORTED_RESUME_FORMATS}.")

@@ -12,6 +12,7 @@ from backend.schemas import (
 )
 from backend.auth_utils import get_current_user
 from backend.ai_engine import generate_project_recommendations_ai
+from backend.profile_context import build_candidate_context
 
 router = APIRouter(prefix="/projects", tags=["Project Recommendations"])
 
@@ -23,8 +24,13 @@ def generate_projects_endpoint(
     db: Session = Depends(get_db),
 ):
     skills = payload.skills
+    profile = (
+        db.query(CandidateProfileModel)
+        .filter(CandidateProfileModel.user_id == user.id)
+        .order_by(CandidateProfileModel.updated_at.desc(), CandidateProfileModel.created_at.desc())
+        .first()
+    )
     if not skills:
-        profile = db.query(CandidateProfileModel).filter(CandidateProfileModel.user_id == user.id).first()
         skills = profile.skills if profile and profile.skills else []
 
     # Deduplication: if the user already has project briefs for this exact domain+difficulty
@@ -55,6 +61,8 @@ def generate_projects_endpoint(
         domain=domain,
         difficulty=difficulty,
         session_id=user.id,
+        preferred_provider=payload.preferred_provider,
+        candidate_context=build_candidate_context(profile),
     )
 
     saved_briefs = []

@@ -7,11 +7,34 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from backend.database import get_db, User, CandidateProfileModel
-from backend.schemas import CandidateProfileData, CandidateProfileOut
+from backend.schemas import (
+    CandidateProfileOut,
+    CandidateProfileUpdate,
+    ResumeAnalysisDetails,
+)
 from backend.auth_utils import get_current_user
 
 router = APIRouter(prefix="/profiles", tags=["Candidate Profiles"])
 logger = logging.getLogger(__name__)
+
+
+def _profile_response(profile: CandidateProfileModel) -> CandidateProfileOut:
+    response = CandidateProfileOut.model_validate(profile)
+    analysis = ResumeAnalysisDetails.model_validate(profile.resume_analysis or {})
+    response_data = response.model_dump()
+    response_data.update(analysis.model_dump())
+    response_data["resume_analysis"] = analysis.model_dump()
+    return CandidateProfileOut.model_validate(response_data)
+
+
+def _has_analysis_value(value) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, (list, dict)):
+        return bool(value)
+    return True
 
 
 def _seed_profiles_if_needed(db: Session, user: User):
@@ -77,12 +100,12 @@ def _seed_profiles_if_needed(db: Session, user: User):
 @router.get("/me", response_model=CandidateProfileOut)
 def get_my_profile(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     profile = _seed_profiles_if_needed(db, user)
-    return CandidateProfileOut.model_validate(profile)
+    return _profile_response(profile)
 
 
 @router.put("/me", response_model=CandidateProfileOut)
 def update_my_profile(
-    payload: CandidateProfileData,
+    payload: CandidateProfileUpdate,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -96,9 +119,40 @@ def update_my_profile(
         profile = CandidateProfileModel(user_id=user.id)
         db.add(profile)
 
-    for field, val in payload.model_dump().items():
-        if hasattr(profile, field):
-            setattr(profile, field, val)
+    profile_fields = {
+        "full_name",
+        "email",
+        "phone",
+        "location",
+        "target_role",
+        "experience_level",
+        "summary",
+        "skills",
+        "soft_skills",
+        "experience",
+        "education",
+        "certifications",
+        "projects",
+        "missing_information",
+        "strengths",
+        "improvement_recommendations",
+    }
+    for field in profile_fields & payload.model_fields_set:
+        setattr(profile, field, getattr(payload, field))
+
+    if "resume_analysis" in payload.model_fields_set and payload.resume_analysis is not None:
+        provided_analysis = payload.resume_analysis.model_dump(
+            mode="json",
+            exclude_unset=True,
+        )
+        if payload.replace_resume_analysis:
+            profile.resume_analysis = provided_analysis
+        else:
+            current_analysis = dict(profile.resume_analysis or {})
+            for field, value in provided_analysis.items():
+                if _has_analysis_value(value):
+                    current_analysis[field] = value
+            profile.resume_analysis = current_analysis
 
     # Recalculate readiness score dynamically based on filled sections
     score = 0
@@ -116,7 +170,7 @@ def update_my_profile(
 
     db.commit()
     db.refresh(profile)
-    return CandidateProfileOut.model_validate(profile)
+    return _profile_response(profile)
 
 
 @router.get("", response_model=List[CandidateProfileOut])
@@ -130,4 +184,4 @@ def list_profiles(user: User = Depends(get_current_user), db: Session = Depends(
     if not profiles:
         p = _seed_profiles_if_needed(db, user)
         profiles = [p]
-    return [CandidateProfileOut.model_validate(p) for p in profiles]
+    return [_profile_response(profile) for profile in profiles]

@@ -72,6 +72,7 @@ def match_job_endpoint(
         job_description=payload.job_description,
         target_role=target_role,
         session_id=user.id,
+        preferred_provider=payload.preferred_provider,
     )
 
     match_record = JobMatchModel(

@@ -3,16 +3,19 @@ import { Sparkles, CheckCircle2, AlertCircle, Lightbulb, Sliders } from 'lucide-
 import { api } from '../services/api';
 import { InterviewQuestion, InterviewAnalysis } from '../types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/Card';
+import { AIModelSelector } from '../components/AIModelSelector';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Textarea, Input } from '../components/ui/Input';
 import { Skeleton } from '../components/ui/Skeleton';
 import { useToast } from '../context/ToastContext';
+import { useAIProvider } from '../hooks/useAIProvider';
 
 export const InterviewCoachPage: React.FC = () => {
   const { success, error, warning } = useToast();
+  const { providers, preferredProvider, selectProvider, loadingProviders } = useAIProvider();
 
-  const [targetRole, setTargetRole] = useState('Full Stack AI Engineer');
+  const [targetRole, setTargetRole] = useState('');
   const [interviewType, setInterviewType] = useState<'technical' | 'behavioral'>('technical');
   const [level, setLevel] = useState('Entry-level');
 
@@ -28,9 +31,19 @@ export const InterviewCoachPage: React.FC = () => {
   useEffect(() => {
     async function loadInitial() {
       try {
-        const history = await api.interviews.history();
-        if (history.length > 0) {
-          setEvaluation(history[0]);
+        const [history, profile] = await Promise.allSettled([
+          api.interviews.history(),
+          api.profiles.getMyProfile(),
+        ]);
+        if (history.status === 'fulfilled' && history.value.length > 0) {
+          setEvaluation(history.value[0]);
+          if (profile.status !== 'fulfilled' || !profile.value.target_role) {
+            setTargetRole(history.value[0].target_role);
+          }
+        }
+        if (profile.status === 'fulfilled') {
+          setTargetRole(profile.value.target_role || (history.status === 'fulfilled' ? history.value[0]?.target_role : '') || '');
+          setLevel(profile.value.experience_level || 'Entry-level');
         }
       } catch (err) {
         console.error('Failed to load initial interview state', err);
@@ -42,12 +55,17 @@ export const InterviewCoachPage: React.FC = () => {
   }, []);
 
   const handleGenerateQuestions = async () => {
+    if (targetRole.trim().length < 2) {
+      warning('Target role required', 'Enter a target role or add one to your Candidate Profile before generating interview questions.');
+      return;
+    }
     setIsGenerating(true);
     try {
       const res = await api.interviews.getQuestions({
         target_role: targetRole,
         interview_type: interviewType,
         level,
+        preferred_provider: preferredProvider,
       });
       setQuestions(res.questions);
       if (res.questions.length > 0) {
@@ -76,6 +94,7 @@ export const InterviewCoachPage: React.FC = () => {
         interview_type: interviewType,
         question: selectedQuestion.question,
         user_answer: userAnswer.trim(),
+        preferred_provider: preferredProvider,
       });
       setEvaluation(res);
       success('Evaluation Complete! 🎯', `Your response scored ${res.answer_score}/100`);
@@ -167,6 +186,16 @@ export const InterviewCoachPage: React.FC = () => {
                   Generate
                 </Button>
               </div>
+            </div>
+
+            <div className="md:col-span-2">
+              <AIModelSelector
+                providers={providers}
+                preferredProvider={preferredProvider}
+                onChange={selectProvider}
+                loading={loadingProviders}
+                disabled={isGenerating || isEvaluating}
+              />
             </div>
           </div>
         </CardContent>

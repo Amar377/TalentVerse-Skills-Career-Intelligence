@@ -138,13 +138,14 @@ MISTRAL_API_KEY=your_mistral_api_key
 
 **Backend:**
 ```bash
-python -m pip install -r requirements.txt
+py -3.11 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
 **Frontend:**
 ```bash
 cd frontend
-npm install
+npm ci
 npm run build
 cd ..
 ```
@@ -155,7 +156,7 @@ cd ..
 Run the FastAPI application. It serves both the REST API and the compiled React frontend on port 8000:
 
 ```bash
-python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
+.\.venv\Scripts\python.exe -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
 ```
 Open **[http://localhost:8000](http://localhost:8000)** in your browser.
 
@@ -170,14 +171,16 @@ Open **[http://localhost:8000](http://localhost:8000)** in your browser.
    ```
 Open **[http://localhost:5173](http://localhost:5173)** in your browser.
 
+AI generation pages include a provider/model selector. Groq is preferred by default; if it fails, TalentVerse tries the other configured providers. The selector lists configured provider models from the backend environment. After changing a model or API key in `.env`, restart the backend so it reloads the configuration. The Settings page's “key loaded” status only confirms that a value is configured; it does not test provider availability.
+
 ---
 
 ## ðŸ§ª Automated Testing
 Install development dependencies and run the backend suite. Setting the provider order to `disabled` verifies the no-provider error path without making live provider requests:
 ```bash
-python -m pip install -r requirements-dev.txt
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
 $env:AI_PROVIDER_ORDER="disabled"
-python -m pytest backend/tests -q
+.\.venv\Scripts\python.exe -m pytest backend/tests -q
 Remove-Item Env:AI_PROVIDER_ORDER
 ```
 
@@ -194,3 +197,5 @@ Remove-Item Env:AI_PROVIDER_ORDER
 ## Database and Schema Changes
 
 SQLite is the default database. Startup creates missing tables with SQLAlchemy metadata, but the repository does not currently include versioned database migrations; `create_all` does not update existing table schemas. Back up the database and add a migration workflow before applying schema changes to an existing deployment. PostgreSQL is not currently a documented or dependency-complete deployment target.
+
+The ignored `talentverse_profiles.json` file still contains a legacy profile that is imported on demand for a matching account. Keep it until that data is migrated or securely backed up.

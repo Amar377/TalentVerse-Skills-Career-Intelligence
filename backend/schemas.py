@@ -1,8 +1,11 @@
 """Pydantic schemas for request and response validation."""
 from __future__ import annotations
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict, Field, EmailStr
+from pydantic import BaseModel, ConfigDict, Field, EmailStr, field_validator
+
+
+AIProviderName = Literal["groq", "gemini", "openai", "mistral"]
 
 
 # Auth schemas
@@ -34,6 +37,49 @@ class Token(BaseModel):
     user: UserOut
 
 
+class ResumeExperienceAnalysis(BaseModel):
+    company: Optional[str] = None
+    job_title: Optional[str] = None
+    duration: Optional[str] = None
+    responsibilities: List[str] = Field(default_factory=list)
+    achievements: List[str] = Field(default_factory=list)
+    missing_measurable_results: List[str] = Field(default_factory=list)
+    suggestions: List[str] = Field(default_factory=list)
+
+
+class ResumeEducationAnalysis(BaseModel):
+    degree: Optional[str] = None
+    institution: Optional[str] = None
+    graduation_year: Optional[str] = None
+
+
+class ResumeProjectAnalysis(BaseModel):
+    name: Optional[str] = None
+    technologies: List[str] = Field(default_factory=list)
+    description: Optional[str] = None
+    achievements: List[str] = Field(default_factory=list)
+    suggestions: List[str] = Field(default_factory=list)
+
+
+class ResumeAnalysisDetails(BaseModel):
+    current_role: Optional[str] = None
+    total_experience: Optional[str] = None
+    summary_quality_analysis: str = ""
+    summary_improvement_suggestions: List[str] = Field(default_factory=list)
+    skills_by_category: Dict[str, List[str]] = Field(default_factory=dict)
+    target_role_skill_alignment: List[str] = Field(default_factory=list)
+    experience_analysis: List[ResumeExperienceAnalysis] = Field(default_factory=list)
+    education_analysis: List[ResumeEducationAnalysis] = Field(default_factory=list)
+    projects_analysis: List[ResumeProjectAnalysis] = Field(default_factory=list)
+    project_improvement_suggestions: List[str] = Field(default_factory=list)
+    ats_score: Optional[int] = Field(default=None, ge=0, le=100)
+    ats_score_explanation: str = ""
+    ats_matched_keywords: List[str] = Field(default_factory=list)
+    ats_missing_keywords: List[str] = Field(default_factory=list)
+    ats_formatting_issues: List[str] = Field(default_factory=list)
+    ats_section_completeness: Dict[str, bool] = Field(default_factory=dict)
+
+
 # Candidate Profile schemas
 class CandidateProfileData(BaseModel):
     full_name: Optional[str] = None
@@ -53,6 +99,22 @@ class CandidateProfileData(BaseModel):
     strengths: List[str] = Field(default_factory=list)
     improvement_recommendations: List[str] = Field(default_factory=list)
     readiness_score: int = Field(default=0, ge=0, le=100)
+    current_role: Optional[str] = None
+    total_experience: Optional[str] = None
+    summary_quality_analysis: str = ""
+    summary_improvement_suggestions: List[str] = Field(default_factory=list)
+    skills_by_category: Dict[str, List[str]] = Field(default_factory=dict)
+    target_role_skill_alignment: List[str] = Field(default_factory=list)
+    experience_analysis: List[ResumeExperienceAnalysis] = Field(default_factory=list)
+    education_analysis: List[ResumeEducationAnalysis] = Field(default_factory=list)
+    projects_analysis: List[ResumeProjectAnalysis] = Field(default_factory=list)
+    project_improvement_suggestions: List[str] = Field(default_factory=list)
+    ats_score: Optional[int] = Field(default=None, ge=0, le=100)
+    ats_score_explanation: str = ""
+    ats_matched_keywords: List[str] = Field(default_factory=list)
+    ats_missing_keywords: List[str] = Field(default_factory=list)
+    ats_formatting_issues: List[str] = Field(default_factory=list)
+    ats_section_completeness: Dict[str, bool] = Field(default_factory=dict)
 
 
 class CandidateProfileOut(CandidateProfileData):
@@ -60,17 +122,36 @@ class CandidateProfileOut(CandidateProfileData):
     user_id: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    resume_analysis: ResumeAnalysisDetails = Field(default_factory=ResumeAnalysisDetails)
 
     model_config = ConfigDict(from_attributes=True)
 
 
+class ResumeAnalysisProfile(CandidateProfileData):
+    resume_analysis: ResumeAnalysisDetails = Field(default_factory=ResumeAnalysisDetails)
+
+
+class CandidateProfileUpdate(CandidateProfileData):
+    resume_analysis: Optional[ResumeAnalysisDetails] = None
+    replace_resume_analysis: bool = False
+
+
 # Resume Analyzer schemas
 class ResumeAnalysisRequest(BaseModel):
-    resume_text: str = Field(min_length=20)
+    resume_text: str = Field(min_length=30)
+    preferred_provider: Optional[AIProviderName] = None
+    replace_profile: bool = False
+
+    @field_validator("resume_text")
+    @classmethod
+    def require_readable_resume_text(cls, value: str) -> str:
+        if len(value.strip()) < 30:
+            raise ValueError("Resume text must contain at least 30 readable characters.")
+        return value
 
 
 class ResumeAnalysisResponse(BaseModel):
-    profile: CandidateProfileData
+    profile: ResumeAnalysisProfile
     raw_text: str
     extracted_at: datetime = Field(default_factory=datetime.utcnow)
     provider_used: Optional[str] = None
@@ -92,6 +173,7 @@ class RoadmapGenerateRequest(BaseModel):
     career_goal: str = Field(min_length=3)
     experience_level: str = "Student"
     duration_weeks: int = Field(default=8, ge=2, le=52)
+    preferred_provider: Optional[AIProviderName] = None
 
 
 class CareerRoadmapData(BaseModel):
@@ -126,6 +208,7 @@ class JobMatchRequest(BaseModel):
     company: Optional[str] = None
     profile_id: Optional[str] = None
     custom_profile: Optional[CandidateProfileData] = None
+    preferred_provider: Optional[AIProviderName] = None
 
 
 class JobMatchData(BaseModel):
@@ -157,6 +240,7 @@ class ProjectGenerateRequest(BaseModel):
     skills: List[str] = Field(default_factory=list)
     domain: Optional[str] = "General"
     difficulty: Optional[str] = "Intermediate"
+    preferred_provider: Optional[AIProviderName] = None
 
 
 class ProjectBriefData(BaseModel):
@@ -185,6 +269,7 @@ class InterviewQuestionRequest(BaseModel):
     target_role: str = Field(min_length=2)
     interview_type: str = "technical"  # technical or behavioral
     level: str = "Entry-level"
+    preferred_provider: Optional[AIProviderName] = None
 
 
 class InterviewQuestionItem(BaseModel):
@@ -206,6 +291,7 @@ class InterviewEvaluateRequest(BaseModel):
     interview_type: str = "technical"
     question: str
     user_answer: str = Field(min_length=5)
+    preferred_provider: Optional[AIProviderName] = None
 
 
 class InterviewAnalysisData(BaseModel):
